@@ -1,0 +1,239 @@
+<template>
+  <div class="container">
+    <!-- 左侧地图区域 -->
+    <div class="mapContainer">
+      <div id="mapCon"></div>
+    </div>
+
+    <!-- 右侧按钮区域 -->
+    <div class="buttonContainer">
+      <el-button @click="toggleCoordinates">坐标显示</el-button>
+      <el-button @click="toggleLighting">光照模拟</el-button>
+
+      <el-button @click="drawPoint">绘制点</el-button>
+      <el-button @click="drawLine">绘制线</el-button>
+      <el-button @click="drawPolygon">绘制面</el-button>
+      <button @click="moveCameraToPosition(-74.5, 40, 9)">移动相机</button>
+      <button @click="showTextPopup(-74.5, 40, '这里是纽约')">显示文本弹窗</button>
+
+      <!-- 修改此处来显示坐标 -->
+      <p v-if="showCoordinates">{{ coordinates }}</p>
+      <p v-if="measurementResult">测量结果: {{ measurementResult }}</p>
+    </div>
+  </div>
+</template>
+
+<script>
+import mapboxgl from '../mapbox'
+import MapboxDraw from '@mapbox/mapbox-gl-draw';
+import * as turf from '@turf/turf';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+
+export default {
+  name: 'HelloWorld', // 组件的名称
+  data() {
+    return {
+      map: null,
+      draw: null,
+      showCoordinates: false,
+      lightingEnabled: false,  //光照模拟的开关
+      coordinates: '',         //存储坐标信息的属性
+      lightPosition: [1.5, 90, 80], // 初始光照位置，你可以根据需要调整这些值
+      measurementResult: '', // 用于存储测量结果的属性
+    };
+  },
+  mounted() {
+    var map = new mapboxgl.Map({
+      container: 'mapCon',
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: [114.41703647375107, 23.10750961303711],
+      zoom: 12
+    });
+    const self = this; // 保存 Vue 实例的引用，以便在 callback 中使用
+    map.on('load', function () {
+      map.on('mousemove', function (e) {
+        var lngLat = e.lngLat; // 使用 e.lngLat 直接获取经纬度
+        self.coordinates = '经度：' + lngLat.lng.toFixed(6) + '，纬度：' + lngLat.lat.toFixed(6); // 更新 Vue 组件的数据
+      });
+    });
+
+    this.map = map;
+    this.draw = new MapboxDraw({
+      displayControlsDefault: false,
+      controls: {
+        polygon: true,
+        line_string: true,
+      },
+    });
+    this.map.addControl(this.draw);
+    // 监听 draw.create 和 draw.update 事件来计算距离和面积
+    this.map.on('draw.create', this.updateArea);
+    this.map.on('draw.update', this.updateArea);
+    this.map.on('load', () => {
+      // 监听点击事件
+      this.map.on('click', (e) => {
+        // 调用显示文本弹窗的方法，传入点击位置的经纬度
+        this.showTextPopup(e.lngLat.lng, e.lngLat.lat);
+      });
+    });
+  },
+  methods: {
+    // 1.坐标显示
+    toggleCoordinates() {
+      this.showCoordinates = !this.showCoordinates;
+    },
+    addMarker() {
+      const center = this.map.getCenter();
+      new mapboxgl.Marker().setLngLat([center.lng, center.lat]).addTo(this.map);
+    },
+    removeMarker() {
+      // 这里的逻辑可能需要调整，因为每次调用这个方法都会尝试移除所有标记
+      const markers = document.getElementsByClassName('mapboxgl-marker');
+      for (let marker of markers) {
+        marker.remove();
+      }
+    },
+    // 2.光照模拟
+    toggleLighting() {
+      this.lightingEnabled = !this.lightingEnabled; // 切换光照模拟状态
+
+      if (this.lightingEnabled) {
+        // 每次点击时，调整光照位置以模拟太阳位置的变化
+        this.lightPosition[0] += 15; // 方位角，模拟太阳的水平移动
+        if (this.lightPosition[0] > 360) { this.lightPosition[0] = 0; } // 重置方位角
+
+        this.map.setLight({
+          'anchor': 'viewport',
+          'color': 'red',
+          'intensity': 0.5,
+          'position': this.lightPosition // 使用更新后的光照位置
+        });
+      } else {
+        // 如果你希望点击关闭时重置到某个特定状态，也可以在这里设置
+        this.map.setLight({
+          'anchor': 'viewport',
+          'color': 'blue',
+          'intensity': 0.5,
+          'position': [0, 0, 0.5] // 或者任何你认为是“关闭”状态的光照设置
+        });
+      }
+    },
+
+    // 3.绘点线面
+    drawPoint() {
+      this.draw.changeMode('draw_point');
+    },
+    drawLine() {
+      this.draw.changeMode('draw_line_string');
+    },
+    drawPolygon() {
+      this.draw.changeMode('draw_polygon');
+    },
+    // 4.测距离，测面积
+    updateArea() {
+      const data = this.draw.getAll();
+      if (data.features.length > 0) {
+        data.features.forEach((feature) => {
+          let area;
+          let measurement = '';
+          if (feature.geometry.type === 'Polygon') {
+            // 使用 turf 计算面积
+            area = turf.area(feature);
+            // 将面积从平方米转换为平方千米
+            measurement = (area / 1000000).toFixed(2) + ' km²';
+          } else if (feature.geometry.type === 'LineString') {
+            // 使用 turf 计算距离
+            const length = turf.length(feature, { units: 'kilometers' });
+            measurement = length.toFixed(2) + ' km';
+          }
+          // 更新存储测量结果的属性
+          this.measurementResult = measurement;
+        });
+      } else {
+        // 如果没有绘制的图形，清空测量结果
+        this.measurementResult = '';
+      }
+    },
+    // 5.相机移动
+    moveCameraToPosition(lng, lat, zoom) {
+      // 假设你的地图实例存储在 this.map
+      this.map.flyTo({
+        center: [lng, lat],
+        zoom: zoom
+      });
+    },
+    // 6.文本信息弹窗
+    showTextPopup(lng, lat) {
+      // 创建文本内容，包括经纬度信息
+      const text = `经度: ${lng.toFixed(6)}, 纬度: ${lat.toFixed(6)}`;
+
+      // 创建一个 Popup 实例并设置内容和位置
+      new mapboxgl.Popup()
+          .setLngLat([lng, lat])
+          .setHTML(text)
+          .addTo(this.map);
+    },
+
+
+
+
+
+
+  }
+
+
+
+
+
+
+
+}
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+<style scoped>
+.container {
+  display: flex;
+}
+
+.mapContainer {
+  flex: 60;
+}
+
+.buttonContainer {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+/* 样式部分，只作用于当前组件 */
+#mapCon {
+  /* 地图容器的高度*/
+  //height: 120%;
+  height: calc(100vh - 120px);
+  /* 地图容器的宽度为 100%，即占满父容器 */
+  width: 80%;
+}
+.selectInfo {
+  /* 绝对定位，相对于最近的非 static 定位祖先元素 */
+  position: absolute;
+  /* 距离顶部的距离为 10px */
+  top: 10px;
+  /* 距离右边的距离为 10px */
+  right: 10px;
+}
+</style>
+
