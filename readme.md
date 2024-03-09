@@ -30,7 +30,11 @@ CREATE TABLE `locations` (
 PRIMARY KEY (`id`) USING BTREE
 ```
 ## 效果展示
-![](assets/img.png)
-![](assets/img_1.png)
-![](assets/img_2.png)
-![](assets/img_3.png)
+地图展示：使用mapbox搭建的地图
+![](./assets/img.png)
+基本功能：绘制点、线、面、测距离、测面积、光照模拟、坐标显示、文本弹窗、移动相机、视角切换
+![](./assets/img_1.png)
+保存位置到数据库：数据库位置的显示
+![](./assets/img_2.png)
+保存的位置的增删改
+![](./assets/img_3.png)
