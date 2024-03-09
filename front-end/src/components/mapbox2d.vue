@@ -38,6 +38,7 @@
         <el-button @click="drawPolygon">绘制面</el-button>
         <el-button @click="moveCameraToPosition(-74.5, 40, 9)">移动相机</el-button>
         <el-button @click="showTextPopup(-74.5, 40, '这里是纽约')">显示文本弹窗</el-button>
+        <el-button @click="moveCameraToSelectedLocation">移动相机去这里</el-button>
       </div>
 
       <div>
@@ -46,7 +47,14 @@
         <p v-if="measurementResult">测量结果: {{ measurementResult }}</p>
       </div>
     </div>
-
+    <el-select v-model="selectedLocation" placeholder="请选择要显示文本弹窗的地址">
+      <el-option
+        v-for="loc in locations"
+        :key="loc.id"
+        :label="loc.name"
+        :value="loc.id"
+      ></el-option>
+    </el-select>
 
     <!-- 左侧地图区域 -->
     <div class="mapContainer">
@@ -283,6 +291,17 @@ export default {
         zoom: zoom
       });
     },
+    moveCameraToSelectedLocation() {
+    if (this.selectedLocation) {
+      const selectedLoc = this.locations.find(loc => loc.id === this.selectedLocation);
+      if (selectedLoc) {
+        // 调用移动相机的方法，传入选中地址的经纬度和缩放级别
+        this.moveCameraToPosition(selectedLoc.longitude, selectedLoc.latitude, 9);
+      }
+    } else {
+      alert('请先选择要移动相机到的地址');
+    }
+  },
     // 6.文本信息弹窗
     showTextPopup(lng, lat) {
       // 创建文本内容，包括经纬度信息

@@ -18,6 +18,7 @@ const db = mysql.createConnection({
     database: 'school-map'
 });
 
+
 // 获取位置列表--测试成功
 app.get('/locations', (req, res) => {
   db.query('SELECT * FROM locations', (error, results) => {
@@ -99,15 +100,6 @@ app.put('/locations/:id', async (req, res) => {
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
-
-
-
-
-
-
-
-
-
 
 
 
